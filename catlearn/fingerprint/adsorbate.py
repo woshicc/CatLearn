@@ -1,15 +1,17 @@
 """Slab adsorbate fingerprint functions for machine learning."""
 import numpy as np
-
+from scipy.stats import gmean
+from ase.build import make_supercell
 from ase.symbols import string2symbols
-from ase.data import ground_state_magnetic_moments as gs_magmom
+from ase.neighborlist import NeighborList
 from ase.data import atomic_numbers, chemical_symbols
-
+from ase.data import ground_state_magnetic_moments as gs_magmom
+from catlearn.featurize.base import BaseGenerator, check_labels
+from catlearn.featurize.periodic_table_data import default_catlearn_radius
 from catlearn.featurize.periodic_table_data import (list_mendeleev_params,
                                                     default_params, get_radius,
                                                     electronegativities,
                                                     make_labels)
-from catlearn.featurize.base import BaseGenerator, check_labels
 
 
 default_adsorbate_fingerprinters = ['mean_chemisorbed_atoms',
@@ -197,6 +199,89 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
             result = list(np.nanmean(dat, axis=0))
             result += [np.nanmean([gs_magmom[z] for z in numbers])]
             check_labels(labels, result, atoms)
+            return result
+          
+    def mean_site_neighbors(self, atoms=None,
+                            P=[[3, 0, 0], [0, 3, 0], [0, 0, 1]],
+                            gparams=['en_pauling']):
+
+        """developed by cc :: for site neighbors
+        Function that takes an atoms objects and returns a fingerprint
+        vector with properties averaged over the site neighbors metal atoms.
+
+        Parameters
+        ----------
+        atoms : object
+            ASE Atoms object.
+
+        P :
+            supercell matrix.
+
+        gparams:
+            gmean(properties)
+
+        Returns
+        ----------
+        features : list
+            If None was passed, the elements are strings, naming the feature.
+        """
+
+        labels = ['num_sn', 'g_cn']
+        labels += make_labels(gparams, '', '_sn_gmean')
+        labels += make_labels(self.slab_params, '', '_sn_mean')
+        labels.append('ground_state_magmom_sn_mean')
+
+        if atoms is None:
+            return labels
+        else:
+            slab = atoms[:-1]
+            slab3 = make_supercell(slab, P)
+            slab3 += atoms[-1]
+
+            radii = [default_catlearn_radius(z) for z in slab3.numbers]
+            nl = NeighborList(cutoffs=radii, skin=0,
+                              bothways=True, self_interaction=False)
+            nl.update(slab3)
+
+            site_atoms = nl.get_neighbors(-1)[0]
+            site_neighbor = np.array([],dtype=int)
+            for i in site_atoms:
+                site_neighbor = np.append(site_neighbor, nl.get_neighbors(i)[0])
+            site_neighbor = np.unique(site_neighbor)
+
+            for i in site_atoms:
+                site_neighbor = site_neighbor[np.where(site_neighbor != i)]
+            site_neighbor = site_neighbor[:-1]   # Delete Hydygen
+            numbers = [slab3[j].number for j in site_neighbor]
+
+            if len(site_atoms) == 1:
+                cn_max = 12
+            elif len(site_atoms) == 2:
+                cn_max = 18
+            elif len(site_atoms) == 3:
+                cn_max = 22
+            elif len(site_atoms) == 4:
+                cn_max = 26
+            elif len(site_atoms) == 5:
+                cn_max = 30
+            elif len(site_atoms) >= 6:
+                raise AssertionError('site of ' + str(len(site_atoms)) + ' atoms')
+
+            g_cn = 0
+            for i in site_neighbor:
+                g_cn += len(nl.get_neighbors(i)[0])
+            result = [len(site_neighbor),g_cn/cn_max]
+
+            for gparam in gparams:
+                g_dat = list_mendeleev_params(numbers, params=[gparam])
+                g_dat = g_dat[~np.isnan(g_dat)]
+                result.append(gmean(g_dat))
+
+            dat = list_mendeleev_params(numbers, params=self.slab_params)
+            result += list(np.nanmean(dat, axis=0))
+            result += [np.nanmean([gs_magmom[z] for z in numbers])]
+            check_labels(labels, result, atoms)
+
             return result
 
     def min_site(self, atoms=None):
