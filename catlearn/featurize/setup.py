@@ -86,9 +86,11 @@ class FeatureGenerator(
         atom_types : list
             Unique atomic types in the systems. Types are denoted by atomic
             number e.g. for CH4 set [1, 6].
+        # atom_len : int
+        #     The maximum length of all atomic systems that will be passed in a
+        #     data set.
         atom_len : int
-            The maximum length of all atomic systems that will be passed in a
-            data set.
+            The length of the adsornate.
         nprocs : int
             Number of cores available for parallelization. Default is 1, e.g.
             serial. Set None to use all available cores.

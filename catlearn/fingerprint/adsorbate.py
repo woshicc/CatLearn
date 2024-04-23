@@ -200,10 +200,11 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
             result += [np.nanmean([gs_magmom[z] for z in numbers])]
             check_labels(labels, result, atoms)
             return result
-          
+
     def mean_site_neighbors(self, atoms=None,
                             P=[[3, 0, 0], [0, 3, 0], [0, 0, 1]],
-                            gparams=['en_pauling']):
+                            # gparams=['en_pauling'],
+                            ):
 
         """developed by cc :: for site neighbors
         Function that takes an atoms objects and returns a fingerprint
@@ -227,16 +228,17 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
         """
 
         labels = ['num_sn', 'g_cn']
-        labels += make_labels(gparams, '', '_sn_gmean')
+        # labels += make_labels(gparams, '', '_sn_gmean')
         labels += make_labels(self.slab_params, '', '_sn_mean')
         labels.append('ground_state_magmom_sn_mean')
 
         if atoms is None:
             return labels
         else:
-            slab = atoms[:-1]
+            nslab = len(atoms)-self.atom_len
+            slab = atoms[:nslab]
             slab3 = make_supercell(slab, P)
-            slab3 += atoms[-1]
+            slab3 += atoms[nslab:]
 
             radii = [default_catlearn_radius(z) for z in slab3.numbers]
             nl = NeighborList(cutoffs=radii, skin=0,
@@ -244,14 +246,14 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
             nl.update(slab3)
 
             site_atoms = nl.get_neighbors(-1)[0]
-            site_neighbor = np.array([],dtype=int)
+            site_neighbor = np.array([], dtype=int)
             for i in site_atoms:
                 site_neighbor = np.append(site_neighbor, nl.get_neighbors(i)[0])
             site_neighbor = np.unique(site_neighbor)
 
             for i in site_atoms:
                 site_neighbor = site_neighbor[np.where(site_neighbor != i)]
-            site_neighbor = site_neighbor[:-1]   # Delete Hydygen
+            site_neighbor = [i for i in site_neighbor if i < len(slab3)-self.atom_len]
             numbers = [slab3[j].number for j in site_neighbor]
 
             if len(site_atoms) == 1:
@@ -270,12 +272,12 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
             g_cn = 0
             for i in site_neighbor:
                 g_cn += len(nl.get_neighbors(i)[0])
-            result = [len(site_neighbor),g_cn/cn_max]
+            result = [len(site_neighbor), g_cn/cn_max]
 
-            for gparam in gparams:
-                g_dat = list_mendeleev_params(numbers, params=[gparam])
-                g_dat = g_dat[~np.isnan(g_dat)]
-                result.append(gmean(g_dat))
+            # for gparam in gparams:
+            #     g_dat = list_mendeleev_params(numbers, params=[gparam])
+            #     g_dat = g_dat[~np.isnan(g_dat)]
+            #     result.append(gmean(g_dat))
 
             dat = list_mendeleev_params(numbers, params=self.slab_params)
             result += list(np.nanmean(dat, axis=0))
