@@ -235,20 +235,24 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
         if atoms is None:
             return labels
         else:
-            ads_atoms = atoms.subsets['ads_atoms']
-            site_atoms = atoms.subsets['site_atoms']
-            slab = make_supercell(atoms, P)
+            slab = make_supercell(atoms[atoms.subsets['slab_atoms']], P)
+            nslab = len(slab)
+            slab += atoms[atoms.subsets['ads_atoms']]
+            ads_atoms = list(range(len(slab)))[nslab:]
 
             radii = [default_catlearn_radius(z) for z in slab.numbers]
             nl = NeighborList(cutoffs=radii, skin=0,
                               bothways=True, self_interaction=False)
             nl.update(slab)
 
+            site_atoms = np.array([], dtype=int)
+            for i in ads_atoms:
+                site_atoms = np.append(site_atoms, nl.get_neighbors(i)[0])
             site_neighbor = np.array([], dtype=int)
             for i in site_atoms:
                 site_neighbor = np.append(site_neighbor, nl.get_neighbors(i)[0])
             site_neighbor = np.unique(site_neighbor)
-            site_neighbor = [i for i in site_neighbor if i not in ads_atoms]
+            # site_neighbor = [i for i in site_neighbor if i not in ads_atoms]
             site_neighbor = [i for i in site_neighbor if i not in site_atoms]
             numbers = [slab[j].number for j in site_neighbor]
 
