@@ -202,7 +202,7 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
             return result
 
     def mean_site_neighbors(self, atoms=None,
-                            P=[[3, 0, 0], [0, 3, 0], [0, 0, 1]],
+                            P=[[2, 0, 0], [0, 2, 0], [0, 0, 1]],
                             # gparams=['en_pauling'],
                             ):
 
@@ -235,26 +235,22 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
         if atoms is None:
             return labels
         else:
-            nslab = len(atoms)-self.atom_len
-            slab = atoms[:nslab]
-            slab3 = make_supercell(slab, P)
-            slab3 += atoms[nslab:]
+            ads_atoms = atoms.subsets['ads_atoms']
+            site_atoms = atoms.subsets['site_atoms']
+            slab = make_supercell(atoms, P)
 
-            radii = [default_catlearn_radius(z) for z in slab3.numbers]
+            radii = [default_catlearn_radius(z) for z in slab.numbers]
             nl = NeighborList(cutoffs=radii, skin=0,
                               bothways=True, self_interaction=False)
-            nl.update(slab3)
+            nl.update(slab)
 
-            site_atoms = nl.get_neighbors(-1)[0]
             site_neighbor = np.array([], dtype=int)
             for i in site_atoms:
                 site_neighbor = np.append(site_neighbor, nl.get_neighbors(i)[0])
             site_neighbor = np.unique(site_neighbor)
-
-            for i in site_atoms:
-                site_neighbor = site_neighbor[np.where(site_neighbor != i)]
-            site_neighbor = [i for i in site_neighbor if i < len(slab3)-self.atom_len]
-            numbers = [slab3[j].number for j in site_neighbor]
+            site_neighbor = [i for i in site_neighbor if i not in ads_atoms]
+            site_neighbor = [i for i in site_neighbor if i not in site_atoms]
+            numbers = [slab[j].number for j in site_neighbor]
 
             if len(site_atoms) == 1:
                 cn_max = 12
@@ -266,8 +262,10 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
                 cn_max = 26
             elif len(site_atoms) == 5:
                 cn_max = 30
+            # elif len(site_atoms) == 6:
+            #     cn_max = 34
             elif len(site_atoms) >= 6:
-                raise AssertionError('site of ' + str(len(site_atoms)) + ' atoms')
+                raise AssertionError('site of '+str(len(site_atoms))+' atoms')
 
             g_cn = 0
             for i in site_neighbor:
