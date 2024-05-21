@@ -227,11 +227,10 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
             If None was passed, the elements are strings, naming the feature.
         """
 
-        labels = ['num_sn', 'g_cn']
-        # labels += make_labels(gparams, '', '_sn_gmean')
-        labels += make_labels(self.slab_params, '', '_sn_mean')
+        labels = make_labels(self.slab_params, '', '_sn_mean')
         labels.append('ground_state_magmom_sn_mean')
-
+        labels += ['num_sn', 'g_cn']
+        # labels += make_labels(gparams, '', '_sn_gmean')
         if atoms is None:
             return labels
         else:
@@ -248,11 +247,14 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
             site_atoms = np.array([], dtype=int)
             for i in ads_atoms:
                 site_atoms = np.append(site_atoms, nl.get_neighbors(i)[0])
+            site_atoms = np.unique(site_atoms)
+            site_atoms = [i for i in site_atoms if i not in ads_atoms]
+
             site_neighbor = np.array([], dtype=int)
             for i in site_atoms:
                 site_neighbor = np.append(site_neighbor, nl.get_neighbors(i)[0])
             site_neighbor = np.unique(site_neighbor)
-            # site_neighbor = [i for i in site_neighbor if i not in ads_atoms]
+            site_neighbor = [i for i in site_neighbor if i not in ads_atoms]
             site_neighbor = [i for i in site_neighbor if i not in site_atoms]
             numbers = [slab[j].number for j in site_neighbor]
 
@@ -274,16 +276,16 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
             g_cn = 0
             for i in site_neighbor:
                 g_cn += len(nl.get_neighbors(i)[0])
-            result = [len(site_neighbor), g_cn/cn_max]
+
+            dat = list_mendeleev_params(numbers, params=self.slab_params)
+            result = list(np.nanmean(dat, axis=0))
+            result += [np.nanmean([gs_magmom[z] for z in numbers])]
+            result += [len(site_neighbor), g_cn/cn_max]
 
             # for gparam in gparams:
             #     g_dat = list_mendeleev_params(numbers, params=[gparam])
             #     g_dat = g_dat[~np.isnan(g_dat)]
             #     result.append(gmean(g_dat))
-
-            dat = list_mendeleev_params(numbers, params=self.slab_params)
-            result += list(np.nanmean(dat, axis=0))
-            result += [np.nanmean([gs_magmom[z] for z in numbers])]
             check_labels(labels, result, atoms)
 
             return result
