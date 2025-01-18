@@ -268,9 +268,9 @@ class AdsorbateFingerprintGenerator(BaseGenerator):
                 cn_max = 26
             elif len(site_atoms) == 5:
                 cn_max = 30
-            # elif len(site_atoms) == 6:
-            #     cn_max = 34
-            elif len(site_atoms) >= 6:
+            elif len(site_atoms) == 6:
+                cn_max = 34
+            elif len(site_atoms) > 6:
                 raise AssertionError('site of '+str(len(site_atoms))+' atoms')
 
             g_cn = 0
